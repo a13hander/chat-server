@@ -2,37 +2,27 @@ package auth
 
 import (
 	"context"
-	"log"
 
 	authV1 "github.com/a13hander/auth-service-api/pkg/auth_v1"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/a13hander/chat-server/internal/domain/model"
 	"github.com/a13hander/chat-server/internal/domain/usecase"
 )
 
-var _ Client = (*grpcClient)(nil)
-var _ usecase.UserRepo = (*grpcClient)(nil)
+var _ Client = (*authClient)(nil)
+var _ usecase.UserRepo = (*authClient)(nil)
 
-type grpcClient struct {
-	grpcClient authV1.AuthV1Client
+type authClient struct {
+	authV1Client authV1.AuthV1Client
 }
 
-func NewGrpcClient(address string) *grpcClient {
-	cc, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
-
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	ac := authV1.NewAuthV1Client(cc)
-
-	return &grpcClient{grpcClient: ac}
+func NewAuthClient(authV1Client authV1.AuthV1Client) *authClient {
+	return &authClient{authV1Client: authV1Client}
 }
 
-func (c *grpcClient) Create(ctx context.Context, u *usecase.CreateUser) (int, error) {
+func (c *authClient) Create(ctx context.Context, u *usecase.CreateUser) (int, error) {
 	req := &authV1.CreateRequest{
 		User: &authV1.UserInfo{
 			Email:    u.Email,
@@ -43,7 +33,7 @@ func (c *grpcClient) Create(ctx context.Context, u *usecase.CreateUser) (int, er
 		PasswordConfirm: u.PasswordConfirm,
 	}
 
-	cr, err := c.grpcClient.Create(ctx, req, grpc.EmptyCallOption{})
+	cr, err := c.authV1Client.Create(ctx, req, grpc.EmptyCallOption{})
 	if err != nil {
 		return 0, err
 	}
@@ -51,8 +41,8 @@ func (c *grpcClient) Create(ctx context.Context, u *usecase.CreateUser) (int, er
 	return int(cr.GetId()), nil
 }
 
-func (c *grpcClient) GetAll(ctx context.Context) ([]*model.User, error) {
-	lr, err := c.grpcClient.List(ctx, &emptypb.Empty{}, grpc.EmptyCallOption{})
+func (c *authClient) GetAll(ctx context.Context) ([]*model.User, error) {
+	lr, err := c.authV1Client.List(ctx, &emptypb.Empty{}, grpc.EmptyCallOption{})
 	if err != nil {
 		return nil, err
 	}
