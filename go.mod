@@ -3,7 +3,7 @@ module github.com/a13hander/chat-server
 go 1.19
 
 require (
-	github.com/a13hander/auth-service-api v0.0.0-20230620180522-d14e10280a5a
+	github.com/a13hander/auth-service-api v0.0.0-20230621082155-d56c245be05e
 	github.com/ilyakaznacheev/cleanenv v1.4.2
 	github.com/joho/godotenv v1.5.1
 	google.golang.org/grpc v1.56.0
