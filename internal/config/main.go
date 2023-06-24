@@ -9,7 +9,8 @@ import (
 )
 
 type Config struct {
-	GrpcAddress string `env:"GRPC_ADDRESS" env-default:"localhost:50051"`
+	GrpcPort      string `env:"GRPC_PORT" env-required:"true"`
+	AccessAddress string `env:"ACCESS_ADDRESS" env-default:"localhost:50051"`
 }
 
 var config *Config
@@ -19,8 +20,7 @@ func GetConfig() *Config {
 	onceConfig.Do(func() {
 		err := godotenv.Load()
 		if err != nil {
-
-			log.Println(err)
+			log.Fatalln(err)
 		}
 
 		config = &Config{}

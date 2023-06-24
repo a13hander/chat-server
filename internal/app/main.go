@@ -2,15 +2,23 @@ package app
 
 import (
 	"context"
+	"log"
+	"net"
+	"net/http"
+	"sync"
 
-	"github.com/a13hander/chat-server/internal/app/cli"
 	"github.com/a13hander/chat-server/internal/config"
+	"github.com/a13hander/chat-server/internal/interceptor"
+	desc "github.com/a13hander/chat-server/pkg/chat_v1"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 type App struct {
 	serviceProvider *serviceProvider
 	config          *config.Config
-	appCli          cli.AppCli
+	grpcServer      *grpc.Server
+	swaggerServer   *http.Server
 }
 
 func NewApp(ctx context.Context) (*App, error) {
@@ -25,14 +33,33 @@ func NewApp(ctx context.Context) (*App, error) {
 }
 
 func (a *App) Run(ctx context.Context) error {
-	return a.appCli.Run(ctx)
+	defer func() {
+		closer.closeAll()
+		closer.wait()
+	}()
+
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+
+		err := a.runGrpcServer(ctx)
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}()
+
+	wg.Wait()
+
+	return nil
 }
 
 func (a *App) initDeps(ctx context.Context) error {
 	inits := []func(context.Context) error{
 		a.initConfig,
 		a.initServiceProvider,
-		a.initAppCli,
+		a.initGrpcServer,
 	}
 
 	for _, f := range inits {
@@ -51,18 +78,34 @@ func (a *App) initConfig(_ context.Context) error {
 }
 
 func (a *App) initServiceProvider(_ context.Context) error {
-	a.serviceProvider = NewServiceProvider()
+	a.serviceProvider = newServiceProvider()
 	return nil
 }
 
-func (a *App) initAppCli(ctx context.Context) error {
-	if a.appCli == nil {
-		a.appCli = cli.NewAppCli(a.serviceProvider.GetCreateUserUseCase(ctx), a.serviceProvider.GetListUserUseCase(ctx))
+func (a *App) initGrpcServer(ctx context.Context) error {
+	accessInter := interceptor.NewAuthInterceptor(a.serviceProvider.GetAccessChecker(ctx))
+
+	a.grpcServer = grpc.NewServer(grpc.UnaryInterceptor(accessInter.Unary()))
+
+	desc.RegisterChatV1Server(a.grpcServer, a.serviceProvider.GetChatV1ServerImpl(ctx))
+
+	reflection.Register(a.grpcServer)
+
+	return nil
+}
+
+func (a *App) runGrpcServer(_ context.Context) error {
+	log.Printf("Grpc server starting on %s\n", a.config.GrpcPort)
+
+	listener, err := net.Listen("tcp", a.config.GrpcPort)
+	if err != nil {
+		return err
+	}
+
+	err = a.grpcServer.Serve(listener)
+	if err != nil {
+		return err
 	}
 
 	return nil
-}
-
-func (a *App) RunCli(ctx context.Context) error {
-	return a.appCli.Run(ctx)
 }
