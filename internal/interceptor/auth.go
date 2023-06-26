@@ -6,12 +6,18 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
-
-	"github.com/a13hander/chat-server/internal/domain/usecase"
 )
 
+type AccessChecker interface {
+	Check(ctx context.Context, endpoint string) (bool, error)
+}
+
 type AuthInterceptor struct {
-	checkAccessUseCase usecase.CheckAccessUseCase
+	accessChecker AccessChecker
+}
+
+func NewAuthInterceptor(accessChecker AccessChecker) *AuthInterceptor {
+	return &AuthInterceptor{accessChecker: accessChecker}
 }
 
 func (a *AuthInterceptor) Unary() grpc.UnaryServerInterceptor {
@@ -21,7 +27,7 @@ func (a *AuthInterceptor) Unary() grpc.UnaryServerInterceptor {
 			ctx = metadata.NewOutgoingContext(ctx, md)
 		}
 
-		check, err := a.checkAccessUseCase.Run(ctx, info.FullMethod)
+		check, err := a.accessChecker.Check(ctx, info.FullMethod)
 		if err != nil || !check {
 			return nil, fmt.Errorf("access deniend: %w", err)
 		}
