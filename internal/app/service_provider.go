@@ -14,7 +14,6 @@ import (
 )
 
 type serviceProvider struct {
-	grpcClient       *grpc.ClientConn
 	accessClient     accessV1.AccessV1Client
 	chatV1ServerImpl *chatV1.Implementation
 	accessChecker    interceptor.AccessChecker
@@ -24,22 +23,14 @@ func newServiceProvider() *serviceProvider {
 	return &serviceProvider{}
 }
 
-func (c *serviceProvider) GetGrpcClient() *grpc.ClientConn {
-	if c.grpcClient == nil {
+func (c *serviceProvider) GetAccessClient() accessV1.AccessV1Client {
+	if c.accessClient == nil {
 		conn, err := grpc.Dial(config.GetConfig().AccessAddress, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
 			log.Fatalln(err)
 		}
 
-		c.grpcClient = conn
-	}
-
-	return c.grpcClient
-}
-
-func (c *serviceProvider) GetAccessClient() accessV1.AccessV1Client {
-	if c.accessClient == nil {
-		c.accessClient = accessV1.NewAccessV1Client(c.GetGrpcClient())
+		c.accessClient = accessV1.NewAccessV1Client(conn)
 	}
 
 	return c.accessClient
