@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/a13hander/chat-server/internal/chat"
+	chatService "github.com/a13hander/chat-server/internal/service/chat"
 	desc "github.com/a13hander/chat-server/pkg/chat_v1"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
@@ -24,14 +25,14 @@ func (i *Implementation) ConnectChat(req *desc.ConnectChatRequest, stream desc.C
 	return chat.Connect(
 		chat.Id(req.GetChatId()),
 		chat.UserName(req.GetUsername()),
-		stream,
+		chatService.NewStream(stream),
 	)
 }
 
 func (i *Implementation) SendMessage(ctx context.Context, req *desc.SendMessageRequest) (*emptypb.Empty, error) {
 	err := chat.SendMessage(
 		chat.Id(req.GetChatId()),
-		req.Message,
+		chatService.ConvertMessageToDomain(req.Message),
 	)
 	if err != nil {
 		return nil, err

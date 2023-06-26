@@ -1,10 +1,11 @@
 package chat
 
 import (
+	"context"
 	"errors"
 	"sync"
+	"time"
 
-	desc "github.com/a13hander/chat-server/pkg/chat_v1"
 	"github.com/google/uuid"
 )
 
@@ -16,23 +17,34 @@ const magicChannelsLen = 100
 var chats = make(map[Id]*Chat)
 var mxChat sync.RWMutex
 
-var channels = make(map[Id]chan *desc.Message)
+var channels = make(map[Id]chan Message)
 var mxChannel sync.RWMutex
 
+type Message interface {
+	From() string
+	Text() string
+	CreatedAt() time.Time
+}
+
+type Stream interface {
+	Send(message Message) error
+	Context() context.Context
+}
+
 type Chat struct {
-	streams map[UserName]desc.ChatV1_ConnectChatServer
+	streams map[UserName]Stream
 	m       sync.RWMutex
 }
 
 func Create() Id {
 	id := Id(uuid.New().String())
 
-	channels[id] = make(chan *desc.Message, magicChannelsLen)
+	channels[id] = make(chan Message, magicChannelsLen)
 
 	return id
 }
 
-func Connect(id Id, username UserName, stream desc.ChatV1_ConnectChatServer) error {
+func Connect(id Id, username UserName, stream Stream) error {
 	mxChannel.RLock()
 	ch, ok := channels[id]
 	mxChannel.RUnlock()
@@ -44,7 +56,7 @@ func Connect(id Id, username UserName, stream desc.ChatV1_ConnectChatServer) err
 	mxChat.Lock()
 	if _, chatOk := chats[id]; !chatOk {
 		chats[id] = &Chat{
-			streams: map[UserName]desc.ChatV1_ConnectChatServer{},
+			streams: map[UserName]Stream{},
 		}
 	}
 	mxChat.Unlock()
@@ -75,7 +87,7 @@ func Connect(id Id, username UserName, stream desc.ChatV1_ConnectChatServer) err
 	}
 }
 
-func SendMessage(id Id, message *desc.Message) error {
+func SendMessage(id Id, message Message) error {
 	mxChannel.RLock()
 	chatChan, ok := channels[id]
 	mxChannel.RUnlock()
